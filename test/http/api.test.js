@@ -10,22 +10,24 @@ describe('PackManager', () => {
         })
 
         test('with proper parameters', () => {
-            const activatePackage = aemApi.Package('my_package', 'my_packages', '0.0.1');
+            const activatePackage = aemApi.Package('my_packages', 'my_package', '0.0.1');
 
             aemApi.packMgr.activate(conn, activatePackage);
 
             expect(conn.requests[0].method).toEqual('POST');
             expect(conn.requests[0].arguments.path).toEqual('/crx/packmgr/service/script.html/etc/packages/my_packages/my_package-0.0.1.zip');
+            expect(conn.requests[0].arguments.form).toEqual({cmd: 'replicate'});
         });
 
         test('with unversioned package', () => {
-            const activatePackage = aemApi.Package('my_unversioned_package', 'my_packages');
+            const activatePackage = aemApi.Package('my_packages', 'my_unversioned_package');
 
             aemApi.packMgr.activate(conn, activatePackage);
 
             expect(conn.requests[0].method).toEqual('POST');
             expect(conn.requests[0].arguments.path)
                 .toEqual('/crx/packmgr/service/script.html/etc/packages/my_packages/my_unversioned_package.zip');
+            expect(conn.requests[0].arguments.form).toEqual({cmd: 'replicate'});
         });
 
         test('with broken package object', () => {

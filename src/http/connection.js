@@ -1,3 +1,14 @@
+/*
+  This module provides two types of connection object based on a use case:
+  - FakeConnection, which records all calls and exposes it by an additional
+    property "requests"
+  - HttpConnection, Axios wrapper that sends actual HTTP(S) requests to
+    some remote service, based on additional configuration object
+  Both these services should have the same methods used in dependent modules
+  for handling business cases. If one changes the behavior in one of them,
+  must change verify the need to apply any changes to the other one.
+*/
+
 const FakeConnection = function (init) {
     this.requests = init ? init : [];
 
@@ -5,19 +16,32 @@ const FakeConnection = function (init) {
         this.requests.push({method: 'GET', arguments: arguments});
     }
 
-    this.post = function (path, query, form) {
+    this.post = function (path, form) {
         this.requests.push({method: 'POST', arguments: {
             path: path,
-            query: query,
             form: form
         }});
     }
 }
 
-const http = require('http'),
-FormData = require('form-data');
+const FormData = require('form-data'),
+https = require('https'),
+axios = require('axios');
 
-const HttpConnection = function (host, auth) {
+const HttpConnection = function (host, port, auth, options) {
+
+    let axiosInstance;
+
+    if (options && options.unsafeSsl) {
+        axiosInstance = axios.create({
+            httpsAgent: new https.Agent({
+                rejectUnauthorized: false
+            })
+        });
+    } else {
+        axiosInstance = axios.create();
+    }
+
     const formDataToForm = function (form) {
         if (form) {
             const result = new FormData();
@@ -36,33 +60,40 @@ const HttpConnection = function (host, auth) {
     }
 
     this.post = async function (path, query) {
-        //const form = formDataToForm(formData);
+        const form = formDataToForm(query);
         try {
             const result = await new Promise((resolve, reject) => {
-                const req = http.request({
+                const protocol = port == '443' ? 'https' : 'http';
+                const options = {
+                    url: `${protocol}://${host}:${port}${path}`,
                     method: 'post',
-                    path: `${path}${query ? '?' + query : ''}`,
-                    auth: auth,
-                    host: host,
-                    //headers: form.getHeaders()
-                });
-        
-                //form.pipe(req);
-
-                req.on('end', (err) => {
-                    resolve(err);
-                })
-
-                req.on('error', (err) => {
+                    auth: {
+                        username: auth.username,
+                        password: auth.password
+                    }
+                }
+                if (query) {
+                    options.headers = form.getHeaders()
+                    options.data = form
+                }
+                axiosInstance(options).then((res) => {
+                    if (res.status === 200) {
+                        resolve(res);
+                    } else {
+                        reject(res.data, res.status);
+                    }
+                }).catch((err) => {
                     reject(err);
                 })
-        
-                req.end();
-            })
+            });
+            console.log(result.data);
         } catch (error) {
-            console.log(error);
+            if (error.code === 'DEPTH_ZERO_SELF_SIGNED_CERT') {
+                console.log("There is an issue with SSL certificate, consider using --unsafeSsl if you are using self-signed SSL cert");
+            } else {
+                console.log(error);
+            }
         }
-       
     }
 }
 
