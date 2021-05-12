@@ -19,23 +19,36 @@ const Package = function (group, name, version, filters) {
     }
 }
 
-const validateBasePackage = function (pkg) {
-    return pkg.name && pkg.group;
+const validatePackage = (pkg, callback) => {
+    if (pkg.name && pkg.group) {
+        callback();
+    } else {
+        throw new Error(`Cannot instantiate this package ${JSON.stringify(pkg)}`);
+    }
 }
 
 const packMgr = {
     activate: function (conn, pkg) {
-        if (validateBasePackage(pkg)) {
-            const path = `/crx/packmgr/service/script.html/etc/packages/${pkg.group}/${pkg.name}${pkg.version ? '-' + pkg.version : ''}.zip`;
+        validatePackage(pkg, () => {
+            const path = `/crx/packmgr/service/script.html/etc/packages/` + 
+                `${pkg.group}/${pkg.name}${pkg.version ? '-' + pkg.version : ''}.zip`;
             conn.post(path, {
                 cmd: 'replicate'
+            }).then((response) => {
+                if (response.status === 200) {
+                    console.log("Replication finished succesfully");
+                    console.log(response.data);
+                } else {
+                    throw new Error(`There is a problem with fulfilling the request (statusCode: ${response.status}),` +
+                        ` here's the response: \n ${response.data}` + response.data);
+                }
+            }).catch((err) => {
+                throw new Error("Unexpected error occured: " + err);
             });
-        } else {
-            throw new Error(`Cannot instantiate this package ${JSON.stringify(pkg)}`);
-        }
+        });
     },
     create: function () {
-        
+
     },
     modify: function () {
 

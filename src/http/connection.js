@@ -11,6 +11,10 @@
 
 const FakeConnection = function (init) {
     this.requests = init ? init : [];
+    this.response = {
+        status: 200,
+        data: "OK"
+    }
 
     this.get = function () {
         this.requests.push({method: 'GET', arguments: arguments});
@@ -21,6 +25,9 @@ const FakeConnection = function (init) {
             path: path,
             form: form
         }});
+        return new Promise((resolve) => {
+            resolve(this.response);
+        })
     }
 }
 
@@ -77,16 +84,15 @@ const HttpConnection = function (host, port, auth, options) {
                     options.data = form
                 }
                 axiosInstance(options).then((res) => {
-                    if (res.status === 200) {
-                        resolve(res);
-                    } else {
-                        reject(res.data, res.status);
-                    }
+                    resolve(res);
                 }).catch((err) => {
                     reject(err);
                 })
             });
-            console.log(result.data);
+            return {
+                status: result.status,
+                data: result.data
+            }
         } catch (error) {
             if (error.code === 'DEPTH_ZERO_SELF_SIGNED_CERT') {
                 console.log("There is an issue with SSL certificate, consider using --unsafeSsl if you are using self-signed SSL cert");
